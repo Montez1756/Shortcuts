@@ -52,7 +52,8 @@ This project allows you to build, trigger, and run shortcuts that can automate a
 ## 🚀 Getting Started
 
 ### Requirements
-- **Windows 10/11**
+- **Windows 10/11**  
+- Python 3.12+  
 
 ### Install
 ```bash
