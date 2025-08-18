@@ -52,14 +52,11 @@ This project allows you to build, trigger, and run shortcuts that can automate a
 ## 🚀 Getting Started
 
 ### Requirements
-- **Windows 10/11**  
-- Python 3.12+  
-- PyQt5  
-- psutil, wmi, requests  
+- **Windows 10/11**
 
 ### Install
 ```bash
-git clone https://github.com/yourusername/shortcuts-windows.git
-cd shortcuts-windows
+git clone https://github.com/Montez1756/Shortcuts.git
+cd Shortcuts
 pip install -r requirements.txt
 python main.py

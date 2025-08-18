@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['shortcuts.py'],
+    ['main.py'],
     pathex=[],
     binaries=[],
     datas=[],
