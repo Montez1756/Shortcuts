@@ -208,7 +208,7 @@ class MainWindow(QWidget):
             
         self.setWindowTitle("Shortcuts")
         self.setGeometry(0, 0, self._width, self._height)
-        self.setWindowIcon(QIcon(QPixmap('car.png')))
+        self.setWindowIcon(QIcon(QPixmap('shortcuts.png')))
         self.setStyleSheet(f'background-color:{self.backgroundColor};')
         self._y = 0
 
@@ -260,7 +260,6 @@ class MainWindow(QWidget):
         elif delta < 0:
             self._y = min(0, self._y - inc)
         self.resizeEvent(None)
-        print(self._y)
         return super().wheelEvent(event)
     def resizeEvent(self, event):
         padding = 10  # space between each shortcut
