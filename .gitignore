@@ -3,3 +3,4 @@ shorcut/
 shortcuts/
 dist/
 buid/
+__pycache__/
