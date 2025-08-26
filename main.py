@@ -32,14 +32,14 @@ def get_shortcuts():
                 },
                 {
                     'name':'python',
-                    'path':'venv/Scripts/python.exe'
+                    'path':['venv/Scripts/python.exe', 'venv/bin/python']
                 }
                 ]
             shortcut_info = {}
             if os.path.exists(os.path.join(d, '.auto')):
-                print(d)
                 continue
             for path in paths:
+                if path['name'] == 'python'
                 if '(any)' in path['path']:
                     sub = os.path.join(d, path['name'])
                     if os.path.exists(sub):

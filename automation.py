@@ -1,6 +1,9 @@
 from PyQt5.QtCore import QThread, QTimer, QObject, pyqtSignal
 from shortcut import Shortcut
-import wmi, pythoncom, time, psutil, requests
+import sys, time, psutil, requests
+
+if sys.platform == 'win32':
+    import wmi, pythoncom
 class Automator(QObject):
 
     def __init__(self, automations, parent = None):
