@@ -4,3 +4,4 @@ shortcuts/
 dist/
 buid/
 __pycache__/
+*.swp
