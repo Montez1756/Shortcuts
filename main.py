@@ -10,8 +10,11 @@ from console import Console
 from configparser import ConfigParser
 from automation import Automator
 
+OS = sys.platform
 
 def get_shortcuts():
+    if not os.path.exists('shortcuts'):
+        os.makedirs('shortcuts')
     shortcut_dir = os.path.join(os.getcwd(), 'shortcuts')
     shortcuts = []
     for d in os.listdir('shortcuts'):
@@ -32,14 +35,18 @@ def get_shortcuts():
                 },
                 {
                     'name':'python',
-                    'path':['venv/Scripts/python.exe', 'venv/bin/python']
+                    'path':''
                 }
                 ]
+            python_venv = paths[len(paths) - 1]['path']
+            if OS == 'win32':
+                python_venv = 'venv/Scripts/pyhton.exe'
+            elif OS == 'linux':
+                python_venv = 'venv/bin/python'
             shortcut_info = {}
             if os.path.exists(os.path.join(d, '.auto')):
                 continue
             for path in paths:
-                if path['name'] == 'python'
                 if '(any)' in path['path']:
                     sub = os.path.join(d, path['name'])
                     if os.path.exists(sub):
@@ -83,13 +90,19 @@ def get_automations():
                     'path':'venv/Scripts/python.exe'
                 }
                 ]
+            python_venv = paths[len(paths) - 1]['path']
+            if OS == 'win32':
+                python_venv = 'venv/Scripts/pyhton.exe'
+            elif OS == 'linux':
+                python_venv = 'venv/bin/python'
             shortcut_info = {}
             auto_file = os.path.join(d, '.auto')
             if os.path.exists(auto_file):
-                attrs = subprocess.check_output(['attrib', auto_file]).decode().strip()
-                flags, path = attrs.rsplit(' ', 1)
-                if 'H' not in flags:
-                    subprocess.run(['attrib', '+h', auto_file])
+                if OS == 'win32':
+                    attrs = subprocess.check_output(['attrib', auto_file]).decode().strip()
+                    flags, path = attrs.rsplit(' ', 1)
+                    if 'H' not in flags:
+                        subprocess.run(['attrib', '+h', auto_file])
                 for path in paths:
                     if '(any)' in path['path']:
                         sub = os.path.join(d, path['name'])

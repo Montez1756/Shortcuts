@@ -42,7 +42,6 @@ This project allows you to build, trigger, and run shortcuts that can automate a
 - ☁️ Export/import shortcuts for sharing  
 
 ### Future (Linux)
-- 🐧 Native Qt UI for Linux environments  
 - 🔧 Shortcut execution via Bash/Python scripts  
 - 🗂️ Integrations with systemd, cron, DBus signals  
 - 🔌 Unified automation monitors (processes, network, filesystem)  

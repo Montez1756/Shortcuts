@@ -1,9 +1,13 @@
-import json
+import json, sys
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPixmap
 
-LPY = 'shorcut/Scripts/python.exe'
+OS = sys.platform
+if OS == 'win32':
+    LPY = 'shorcut/Scripts/python.exe'
+elif OS == 'linux':
+    LPY = 'shortcut/bin/python'
 
 class Shortcut(QWidget):
     def __init__(self, parent, info):

@@ -2,8 +2,12 @@ from PyQt5.QtCore import QThread, QTimer, QObject, pyqtSignal
 from shortcut import Shortcut
 import sys, time, psutil, requests
 
-if sys.platform == 'win32':
+OS = sys.platform
+
+if OS == 'win32':
     import wmi, pythoncom
+elif OS == 'linux':
+    from Xlib import X, display, Xatom
 class Automator(QObject):
 
     def __init__(self, automations, parent = None):
@@ -75,35 +79,65 @@ class Monitor(QObject):
     def stop(self):
         self._thread.quit()
         # raise NotImplementedError
+
+if OS == 'linux':
+    def get_window_pid(d, window):
+        NET_WM_PID = d.intern_atom('_NET_WM_PID')
+        pid_prop = window.get_full_property(NET_WM_PID, Xatom.CARDINAL)
+        if pid_prop:
+            return pid_prop.value[0]
+        return None
+
 class AppMonitor(Monitor):
     def __init__(self, automations, parent=None):
         super().__init__(automations, parent)
         self.current_programs = {}
         self.needInt = True
-    def runMonitor(self):
-        try:
-            pythoncom.CoInitialize()
-            c = wmi.WMI()
-            process_watcher = c.Win32_Process.watch_for('creation')
-            while True:
-                new_process = process_watcher()
-                pid = new_process.ProcessId
-                name = new_process.Name
+    if OS == 'win32':
+        def runMonitor(self):
+            try:
+                pythoncom.CoInitialize()
+                c = wmi.WMI()
+                process_watcher = c.Win32_Process.watch_for('creation')
+                while True:
+                    new_process = process_watcher()
+                    pid = new_process.ProcessId
+                    name = new_process.Name
 
-                if pid not in self.current_programs:
-                    for automation in self.automations:
-                        if automation.json.get('app') == name:
-                            if is_independent_launch(pid, name):
-                                self.current_programs[pid] = name
+                    if pid not in self.current_programs:
+                        for automation in self.automations:
+                            if automation.json.get('app') == name:
+                                if is_independent_launch(pid, name):
+                                    self.current_programs[pid] = name
+                                    exe = automation.python
+                                    file = automation.file
+                                    args = ['-p', name, str(pid)]
+                                    print(f"Launching automation for {name} (pid {pid})")
+                                    self.run_signal.emit(exe, file, args, self)
+                    time.sleep(0.2)
+
+            except Exception as e:
+                print(f"AppMonitor error: {e}")
+    elif OS == 'linux':
+        def runMonitor(self):
+            try:
+                d = display.Display()
+                root = d.screen().root
+                root.change_attributes(event_mask=X.SubstructureNotifyMask)
+
+                while True:
+                    e.d.next_event()
+                    if e.type == X.CreateNotify:
+                        name = e.window.id
+
+                        for automation in self.automations:
+                            if automation.json.get('app') == name:
                                 exe = automation.python
                                 file = automation.file
-                                args = ['-p', name, str(pid)]
-                                print(f"Launching automation for {name} (pid {pid})")
+                                args = ['-p', name, str(get_window_pid(d, e.window))]
                                 self.run_signal.emit(exe, file, args, self)
-                time.sleep(0.2)
-
-        except Exception as e:
-            print(f"AppMonitor error: {e}")
+            except Exception as e:
+                print(f"AppMonitor error: {e}")
     def handleDone(self, pid: int):
         """Called when Console/ProcessThread finishes automation."""
         if pid in self.current_programs:
