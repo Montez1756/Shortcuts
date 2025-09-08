@@ -1,7 +1,7 @@
 import os, json
 from PyQt5.QtCore import QObject, QProcess, Qt
 from PyQt5.QtWidgets import QWidget, QTextEdit, QVBoxLayout, QPushButton
-from PyQt5.QtGui import QColor, QPixmap, QIcon
+from PyQt5.QtGui import QColor, QPixmap, QIcon, QPalette
 MM = '{EMC}'
 
 
@@ -9,22 +9,22 @@ class ConsoleGui(QWidget):
     def __init__(self, parent : QWidget = None):
         super().__init__(parent)
         self._parent = parent
+        
+        self.setStyleSheet("background-color:rgb(24,24,24);")
 
-        self.setStyleSheet("background-color:black;")
-
-        layout = QVBoxLayout(self)
-        self.setLayout(layout)
+        self.widget = QWidget(self)
 
         icon = QIcon('src/close.png')
         self.closeButton = QPushButton(icon, '', self)
         self.closeButton.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.closeButton.setStyleSheet("background-color:transparent;")
         self.closeButton.clicked.connect(self.finished)
+
         self.text = QTextEdit(self)
         self.text.setReadOnly(True)
         self.text.setTextColor(QColor.fromRgb(255,255,255))
-        self.resize(self.size())
-        layout.addWidget(self.text)
+        self.text.setStyleSheet("background-color:transparent;")
+        # layout.addWidget(self.text)
 
         self.setVisible(False)
     def append(self, text): 
@@ -32,8 +32,12 @@ class ConsoleGui(QWidget):
     def resizeEvent(self, event):
         width = self.width()
         height = self.height()
+
+        self.widget.setGeometry(0,0, width, height)
         self.closeButton.setGeometry(width - 50, 0, 50, 50)
         self.closeButton.raise_()
+
+        self.text.setGeometry(0,50, width, height - 50)
 
         super().resizeEvent(event)
     def finished(self):

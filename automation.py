@@ -1,5 +1,8 @@
 from PyQt5.QtCore import pyqtSignal, QThread, QObject
-import wmi, pythoncom, time
+import sys, time
+OS = sys.platform
+if OS == "win32":
+    import wmi, pythoncom
 class Automator(QObject):
     run_signal = pyqtSignal(QObject, list)
     error_signal = pyqtSignal(str)
@@ -44,12 +47,18 @@ class Monitor(QObject):
 
         self.moveToThread(thread)
 
-        thread.started.connect(self.startMonitor)
+        if OS == "win32":
+            thread.started.connect(self.startMonitor)
+        else:
+            thread.started.connect(self.startMonitor_l)
         thread.start()
 
     def error(self, e):
         self.error_signal.emit(e)
+
     def startMonitor(self):
+        raise NotImplementedError
+    def startMonitor_l(self):
         raise NotImplementedError
     def reload(self):
         raise NotImplementedError

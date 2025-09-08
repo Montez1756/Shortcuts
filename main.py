@@ -16,6 +16,8 @@ class MainWindow(QWidget):
         self.setStyleSheet("background-color:rgb(24,24,24);")
         self.setGeometry(0, 0, self._width, self._height)
         self.setContentsMargins(0,0,0,0)
+        
+        self.setAutoFillBackground(True)
         self.console_gui = ConsoleGui(self)
         self.console = Console(self.console_gui)
 
