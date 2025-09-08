@@ -23,7 +23,7 @@ class ConsoleGui(QWidget):
         self.text = QTextEdit(self)
         self.text.setReadOnly(True)
         self.text.setTextColor(QColor.fromRgb(255,255,255))
-        self.text.setStyleSheet("background-color:transparent;")
+        self.text.setStyleSheet("background-color:transparent; border:none;")
         # layout.addWidget(self.text)
 
         self.setVisible(False)
