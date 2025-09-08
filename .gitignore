@@ -2,3 +2,6 @@
 /venv
 *.exe
 /shortcut
+dist/
+buid/
+*.swp
