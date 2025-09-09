@@ -36,12 +36,19 @@ class ShortcutGui(QWidget):
     def __init__(self, shortcut : Shortcut = None, parent : QWidget = None):
         super().__init__(parent)
 
-        self.setStyleSheet("background-color:rgb(75,75,75); border-radius:10px; color:white;")
-        self.setContentsMargins(10,10,10,10)
         self._parent = parent
         self.shortcut = shortcut
         self.good = self.shortcut.good
-        
+        self._style = "background-color:{0}; border-radius:10px;  color:white;"
+
+        self.initial_color = getattr(self.shortcut, 'background_color', None)
+
+        if self.initial_color:
+            self.setStyleSheet(self._style.format(self.initial_color))
+        else:
+            self.setStyleSheet(self._style.format("rgb(75,75,75)"))
+            
+        self.setContentsMargins(10,10,10,10)
         # layout = QVBoxLayout(self)
         # self.setLayout(layout)
         
@@ -50,7 +57,6 @@ class ShortcutGui(QWidget):
         # layout.addWidget(self.name)
         font = QFont("Ariel", 12,10,False)
         self.name.setFont(font)
-
         if self.shortcut.icon:
             self.icon_pixmap = QPixmap(self.shortcut.icon)
             if not self.icon_pixmap.isNull():
@@ -100,3 +106,18 @@ class ShortcutGui(QWidget):
     def mousePressEvent(self, event):
         self.shortcut.run([])
         super().mousePressEvent(event)
+    def enterEvent(self, a0):
+        palette = self.palette()
+        background_color = palette.color(self.backgroundRole())
+        r, g, b, a = background_color.getRgb()
+
+        # Darken the color, making sure values stay within 0-255
+        r = max(r - 30, 0)
+        g = max(g - 30, 0)
+        b = max(b - 30, 0)
+
+        self.setStyleSheet(self._style.format(f"rgb({r},{g},{b})"))
+        super().enterEvent(a0)
+    def leaveEvent(self, a0):
+        self.setStyleSheet(self._style.format(self.initial_color))
+        super().leaveEvent(a0)
