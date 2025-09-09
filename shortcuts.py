@@ -67,7 +67,7 @@ class ShortcutGui(QWidget):
         self.setAcceptDrops(True)
         self.setVisible(True)
     def dropEvent(self, a0):
-        urls = a0.mimeData().urls()
+        urls = [url.toLocalFile() for url in a0.mimeData().urls()]
         self.shortcut.run(urls)
             
     def dragEnterEvent(self, a0):

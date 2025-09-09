@@ -1,16 +1,28 @@
-import sys, os, json
+import sys, os, json, venv, shutil
 from PyQt5.QtWidgets import QApplication, QWidget, QHBoxLayout, QPushButton
 from PyQt5.QtGui import QIcon
 from console import Console, ConsoleGui
 from shortcuts import ShortcutGui, Shortcut
 from automation import Automator
 
+OS = sys.platform
+
+def create_venv():
+    path = 'bin/python'
+
+    if not os.path.exists(path):
+        venv.create(path)
+        shutil.rmtree('bin/python/Include', True)
+        shutil.rmtree('bin/python/Lib', True)
+def build():
+    create_venv()
+
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__(None)
 
         self.setWindowTitle("Shortcuts")
-
+        self.setWindowIcon(QIcon("src/shortcuts.png"))
         self._width = 500
         self._height = 500
         self.setStyleSheet("background-color:rgb(24,24,24);")
@@ -78,7 +90,7 @@ class MainWindow(QWidget):
                     else:
                         for p in path['path']:
                             new_path = os.path.join(d, p)
-                            info[path['name']] = new_path if os.path.exists(new_path) else sys.executable
+                            info[path['name']] = new_path if os.path.exists(new_path) else "bin/python/python.exe" if OS == "win32" else "bin/python/python"
                 shortcut = Shortcut(info, self.console)
                 shortcuts.append(shortcut)
                 shortcut_gui = ShortcutGui(shortcut, self)
@@ -130,6 +142,8 @@ class MainWindow(QWidget):
 if __name__ == "__main__":
     app = QApplication([])
     
+    build()
+
     window = MainWindow()
     # gui = ConsoleGui()
     # console = Console(gui)
