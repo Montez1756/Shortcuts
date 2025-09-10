@@ -1,21 +1,12 @@
 import sys, os, json, venv, shutil
-from PyQt5.QtWidgets import QApplication, QWidget, QHBoxLayout, QPushButton
+from PyQt5.QtWidgets import QApplication, QWidget, QHBoxLayout, QPushButton, QSystemTrayIcon, QMenu, QAction
 from PyQt5.QtGui import QIcon
 from console import Console, ConsoleGui
 from shortcuts import ShortcutGui, Shortcut
 from automation import Automator
+from utils import ShortcutCreator
 
 OS = sys.platform
-
-def create_venv():
-    path = 'bin/python'
-
-    if not os.path.exists(path):
-        venv.create(path)
-        shutil.rmtree('bin/python/Include', True)
-        shutil.rmtree('bin/python/Lib', True)
-def build():
-    create_venv()
 
 class MainWindow(QWidget):
     def __init__(self):
@@ -23,6 +14,24 @@ class MainWindow(QWidget):
 
         self.setWindowTitle("Shortcuts")
         self.setWindowIcon(QIcon("src/shortcuts.png"))
+
+        self.icon = QSystemTrayIcon(self.windowIcon(), self)
+        self.icon.activated.connect(self.trayTriggered)
+        menu = QMenu(self)
+        menu.setStyleSheet("color:white;")
+        show = QAction("Show", menu)
+        show.triggered.connect(self.show)
+        
+        hide = QAction("Hide", menu)
+        hide.triggered.connect(self.hide)
+        
+        quit = QAction("Quit", menu)
+        quit.triggered.connect(QApplication.quit)
+
+        menu.addActions([show, hide, quit])
+        self.icon.setContextMenu(menu)
+        self.icon.show()
+        
         self._width = 500
         self._height = 500
         self.setStyleSheet("background-color:rgb(24,24,24);")
@@ -42,7 +51,9 @@ class MainWindow(QWidget):
         self.reload_button.clicked.connect(self.reload)
 
         self.show()
-
+    def trayTriggered(self, reason):
+        if reason == QSystemTrayIcon.ActivationReason.Trigger:
+            self.show()
     def getShortcuts(self):
         os.makedirs("shortcut", exist_ok=True)
         sd = os.path.join(os.getcwd(), "shortcut")
@@ -139,14 +150,11 @@ class MainWindow(QWidget):
         self.automator.shortcuts = self.shortcuts
         self.automator.reload()                    
         self.resizeEvent(None)
+    def closeEvent(self, event):
+        event.ignore()
+        self.hide()
 if __name__ == "__main__":
     app = QApplication([])
-    
-    build()
-
-    window = MainWindow()
-    # gui = ConsoleGui()
-    # console = Console(gui)
-    # s_gui = ShortcutGui(None, None)
-    # console.run('python', 'test.py', [])
+    # window = MainWindow()
+    creator = ShortcutCreator(None)
     sys.exit(app.exec_())
