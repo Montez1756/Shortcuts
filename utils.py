@@ -3,19 +3,24 @@ from PyQt5.QtCore import QObject, Qt
 from PyQt5.QtGui import QFontMetrics
 import os, json
 
-def createFile(path, need_file):
-    file = open(path, "wb+")
+def createFile(path, mode, need_file):
+    file = open(path, mode)
     if need_file:
         return file
     else:
         file.close()
+
+def elideText(label, text):
+        metrics = QFontMetrics(label.font())
+        elidedText = metrics.elidedText(text, Qt.TextElideMode.ElideRight, label.width())
+        return elidedText
 
 class Form(QWidget):
     def __init__(self, name : str = "", parent : QWidget = None):
         super().__init__(parent)
         self.name = name
         self.name_label = QLabel(name, self)
-        self.name_label.setText(self.name_label.text().capitalize())
+        self.name_label.setText(elideText(self.name_label, self.name_label.text().capitalize()))
         self.value = None
         # self.name_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.percent = 3
@@ -45,7 +50,7 @@ class DictForm(Form):
         y = self.name_label.height()
         key_height = int(height // len(self.keys))
         for key in self.keys:
-            key.setGeometry(0, y, width, key_height)
+            key.setGeometry(padding, y, width - padding, key_height)
             y += key_height + padding
         super().resizeEvent(a0)
     def getValue(self):
@@ -56,19 +61,22 @@ class DictForm(Form):
 class StrForm(Form):
     def __init__(self, name : str = "", placeholder : bool = False, parent : QWidget = None):
         super().__init__(name, parent)
-        self.percent = 12
+        self.percent = 8
         self.str = QLineEdit(self)
         self.str.setContentsMargins(0,0,0,0)
+        self.placeholder = placeholder
         if placeholder:
             self.name_label.setVisible(False)
-            self.str.setPlaceholderText(name.capitalize())
+
+        self.str.setPlaceholderText(name.capitalize())
     def resizeEvent(self, a0):
         width = self.width()
         height = self.height()
         if not self.placeholder:
+            height //= 2
             self.name_label.setGeometry(0,0, (width // 4), height)
             margin = int(self.name_label.width() // 1.5)
-            self.str.setGeometry(margin, 0, (width - margin), height)
+            self.str.setGeometry(0, height, width, height)
         else:
             self.str.setGeometry(0,0, width, height)
         super().resizeEvent(a0)
@@ -91,23 +99,21 @@ class FileForm(Form):
         self.name_label.setGeometry(0,0, (width // 4), height)
         margin = int(self.name_label.width() // 1.5)
         self.file_button.setGeometry(margin, 0, (width - margin), height)
-        self.file_label.setGeometry(0, height, width, height)
+        self.file_label.setGeometry(10, height, width - 10, height)
         return super().resizeEvent(a0)
     def promptFile(self):
         file = QFileDialog().getOpenFileName(self, "Select File", filter="Image Files (*.png *.jpg *.bmp)")
         if len(file):
             self.file = file[0]
-            self.file_label.setText(self.elideText(self.file_label, self.file))
-    def elideText(self, label, text):
-        metrics = QFontMetrics(label.font())
-        elidedText = metrics.elidedText(text, Qt.TextElideMode.ElideRight, label.width())
-        return elidedText
+            self.file_label.setText(elideText(self.file_label, self.file))
     def getValue(self):
         return self.file
 class ShortcutCreator(QWidget):
     def __init__(self, parent : QWidget = None):
         super().__init__(parent)
-        self.setGeometry(0,0,500,500)
+        self.setStyleSheet("background-color:rgb(24,24,24); color:lightgrey; border-color:lightgrey;")
+        self.widget = QWidget(self)
+
         self.creation_list = [
             {
                 "name":"shortcut",
@@ -132,9 +138,20 @@ class ShortcutCreator(QWidget):
             },
 
         ] 
-        self.inputs = []
+        
+        self.confirm_button = QPushButton("Confirm", self)
+        self.confirm_button.clicked.connect(self.saveForms)
+        
+        self.cancel_button = QPushButton("Cancel", self)
+        self.cancel_button.clicked.connect(self.hide)
+        
+        self.inputs = {}
+        
         self.load_list()
-        self.show()
+        
+        # self.show()
+        self.setVisible(False)
+
     def strInput(self):
         return StrForm
     def dictInput(self):
@@ -155,9 +172,17 @@ class ShortcutCreator(QWidget):
         width = self.width()
         height = self.height()
 
+        self.widget.setGeometry(0,0, width, height)
+
+        button_width = width // 4
+        button_height = height // 12
+        self.confirm_button.setGeometry((width // 2), (height - (button_height + 10)), button_width, button_height)
+        self.cancel_button.setGeometry(((width // 2) + (button_width)), (height - (button_height + 10)), button_width, button_height)
+
         y = 0
         padding = 10
-        for input in self.inputs:
+        for key in self.inputs.keys():
+            input = self.inputs[key]
             input_h = int(height // input.percent)
             half_width = width // 2
             input.setGeometry(half_width - (half_width // 2), y, half_width, input_h)
@@ -166,27 +191,29 @@ class ShortcutCreator(QWidget):
     def saveForms(self):
         shortcut = ""
         for creation in self.creation_list:
-            name = creation.name
-            path  = creation.path
+            name = creation["name"]
+            path  = creation["path"]
             _input = self.inputs[name]
             value = _input.getValue()
             if value:
                 if name == "shortcut":
                     shortcut = os.path.join(path, value)
-                    os.mkdir(shortcut)
+                    os.makedirs(shortcut, exist_ok=True)
                 elif name == "file":
                     file = os.path.join(shortcut, path, value)
-                    createFile(file)
+                    os.makedirs(os.path.join(shortcut, "file"), exist_ok=True)
+                    createFile(file, "w+", False)
                 elif name == "info":
                     file = os.path.join(shortcut, path)
-                    file = createFile(file, True)
+                    file = createFile(file, "w+", True)
                     _json = value
                     file.write(json.dumps(_json))
                     file.close()
                 elif name == "icon":
+                    os.makedirs(os.path.join(shortcut, "icon"), exist_ok=True)
                     _value = os.path.basename(value)
                     file = os.path.join(shortcut, path, _value)
-                    file = createFile(file, True)
+                    file = createFile(file, "wb+", True)
                     with open(value, "rb") as icon_file:
                         file.write(icon_file.read())
                     file.close()
