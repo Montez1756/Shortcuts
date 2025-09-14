@@ -2,7 +2,7 @@ from PyQt5.QtCore import pyqtSignal, QThread, QObject
 import sys, time
 OS = sys.platform
 if OS == "win32":
-    import wmi, pythoncom
+    import wmi, pythoncom, win32process
 class Automator(QObject):
     run_signal = pyqtSignal(QObject, list)
     error_signal = pyqtSignal(str)
@@ -82,10 +82,13 @@ class AppMonitor(Monitor):
                 new_process = process_watcher() 
                 name = new_process.Caption
                 pid = new_process.ProcessId
-
-                for shortcut in self.shortcuts:
-                    if shortcut.app == name:
-                        self.run_signal.emit(shortcut, ['-process', name, pid])
+                try:
+                    parent_pid = win32process.GetParentProcessId(pid)
+                    continue
+                except:
+                    for shortcut in self.shortcuts:
+                        if shortcut.app == name:
+                            self.run_signal.emit(shortcut, ['-process', name, pid])
 
                 time.sleep(0.5)
         except wmi.x_wmi as e:

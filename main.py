@@ -158,3 +158,7 @@ if __name__ == "__main__":
     # window = MainWindow()
     creator = ShortcutCreator(None)
     sys.exit(app.exec_())
+
+
+
+
