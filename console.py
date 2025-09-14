@@ -54,7 +54,7 @@ class Console(QObject):
         dir_name = shortcut.dir_name
         self.gui.setVisible(True)
         self.gui.raise_()
-        self.append(f"Running Command -> {file} {args}")
+        self.append(f"Running Command -> {exe} {file} {args}")
         self.process = QProcess(self)
         self.process.setWorkingDirectory(dir_name)
 

@@ -47,9 +47,16 @@ class MainWindow(QWidget):
 
         self.reload_icon = QIcon("src/reload.png")
         self.reload_button = QPushButton(self.reload_icon, "", self)
-        self.reload_button.setStyleSheet("background-color:transparent;")
+        self.reload_button.setStyleSheet("background-color:rgb(24,24,24); border:none;")
         self.reload_button.clicked.connect(self.reload)
 
+
+        self.shortcut_button = QPushButton("+", self)
+        self.shortcut_button.setStyleSheet("background-color:rgb(24,24,24); color:white; border:none; font-size:30px;")
+        
+        self.shortcut_creator = ShortcutCreator(self)
+        
+        self.shortcut_button.clicked.connect(self.shortcut_creator.show)
         self.show()
     def trayTriggered(self, reason):
         if reason == QSystemTrayIcon.ActivationReason.Trigger:
@@ -117,7 +124,9 @@ class MainWindow(QWidget):
         self.reload_button.setGeometry(0, total_height - 30, 30, 30)
 
         self.console_gui.setGeometry(0,0, total_width, total_height)
+        self.shortcut_creator.setGeometry(0,0, total_width, total_height)
 
+        self.shortcut_button.setGeometry(total_width - 30, total_height - 40, 30, 40)
         padding = 10
         cols = 3
         rows = 3
@@ -155,8 +164,8 @@ class MainWindow(QWidget):
         self.hide()
 if __name__ == "__main__":
     app = QApplication([])
-    # window = MainWindow()
-    creator = ShortcutCreator(None)
+    window = MainWindow()
+    # creator = ShortcutCreator(None)
     sys.exit(app.exec_())
 
 
