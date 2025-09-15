@@ -82,13 +82,15 @@ class AppMonitor(Monitor):
                 new_process = process_watcher() 
                 name = new_process.Caption
                 pid = new_process.ProcessId
+
                 try:
                     parent_pid = win32process.GetParentProcessId(pid)
-                    continue
-                except:
+                except Exception:
                     for shortcut in self.shortcuts:
                         if shortcut.app == name:
                             self.run_signal.emit(shortcut, ['-process', name, pid])
+
+
 
                 time.sleep(0.5)
         except wmi.x_wmi as e:

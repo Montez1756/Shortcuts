@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QWidget, QFileDialog, QLineEdit, QLabel, QPushButton
+from PyQt5.QtWidgets import QWidget, QFileDialog, QLineEdit, QLabel, QPushButton, QCheckBox
 from PyQt5.QtCore import QObject, Qt
 from PyQt5.QtGui import QFontMetrics
 import os, json
@@ -108,6 +108,28 @@ class FileForm(Form):
             self.file_label.setText(elideText(self.file_label, self.file))
     def getValue(self):
         return self.file
+    
+class boolForm(Form):
+    def __init__(self, name = "", parent = None):
+        super().__init__(name, parent)
+        self.percent = 10
+        self.check_button = QCheckBox(self)
+        self.value = False
+        self.check_button.clicked.connect(self.clicked)
+
+    def clicked(self):
+        self.value = False if self.value else True
+        self.check_button.setText(str(self.value))
+
+    def resizeEvent(self, a0):
+        width = self.width()
+        height = self.height() // 2
+
+        self.name_label.setGeometry(0, 0, width, height)
+
+        self.check_button.setGeometry(10, height, width // 3, height)
+    def getValue(self):
+        return self.value
 class ShortcutCreator(QWidget):
     def __init__(self, parent : QWidget = None):
         super().__init__(parent)
@@ -136,7 +158,11 @@ class ShortcutCreator(QWidget):
                 "path":"icon/",
                 "type":self.fileInput
             },
-
+            {
+                "name":"auto",
+                "path":".auto",
+                "type":self.boolInput
+            }
         ] 
         
         self.confirm_button = QPushButton("Confirm", self)
@@ -158,6 +184,8 @@ class ShortcutCreator(QWidget):
         return DictForm
     def fileInput(self):
         return FileForm
+    def boolInput(self):
+        return boolForm
     def load_list(self):
         for input in self.creation_list:
             input_cls = input["type"]()
@@ -217,5 +245,8 @@ class ShortcutCreator(QWidget):
                     with open(value, "rb") as icon_file:
                         file.write(icon_file.read())
                     file.close()
+                elif name == "auto":
+                    if value:
+                        createFile(os.path.join(shortcut, ".auto"), "w+", False)
 
 "LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libstdc++.so.6 matlab"
