@@ -63,7 +63,7 @@ class ShortcutGui(QWidget):
                 self.icon = QLabel(self)
                 self.icon.setPixmap(self.icon_pixmap)
         if not self.good:
-            self.lock_pixmap = QPixmap('src/lock.png')
+            self.lock_pixmap = QPixmap('resources/lock.png')
             self.lock_pixmap = tint_pixmap(self.lock_pixmap, QColor(200, 0, 0))
             if not self.lock_pixmap.isNull():
                 self.lock = QLabel(self)

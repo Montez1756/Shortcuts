@@ -14,7 +14,7 @@ class ConsoleGui(QWidget):
 
         self.widget = QWidget(self)
 
-        icon = QIcon('src/close.png')
+        icon = QIcon('resources/close.png')
         self.closeButton = QPushButton(icon, '', self)
         self.closeButton.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.closeButton.setStyleSheet("background-color:transparent;")

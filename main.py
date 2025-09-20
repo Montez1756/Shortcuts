@@ -13,7 +13,7 @@ class MainWindow(QWidget):
         super().__init__(None)
 
         self.setWindowTitle("Shortcuts")
-        self.setWindowIcon(QIcon("src/shortcuts.png"))
+        self.setWindowIcon(QIcon("resources/shortcuts.png"))
 
         self.icon = QSystemTrayIcon(self.windowIcon(), self)
         self.icon.activated.connect(self.trayTriggered)
@@ -45,7 +45,7 @@ class MainWindow(QWidget):
         self.shortcuts, self.shortcut_guis = self.getShortcuts()
         self.automator = Automator(self.shortcuts)
 
-        self.reload_icon = QIcon("src/reload.png")
+        self.reload_icon = QIcon("resources/reload.png")
         self.reload_button = QPushButton(self.reload_icon, "", self)
         self.reload_button.setStyleSheet("background-color:rgb(24,24,24); border:none;")
         self.reload_button.clicked.connect(self.reload)
