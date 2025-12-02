@@ -1,0 +1,386 @@
+import os, json, sys
+from PyQt5.QtCore import (QObject, Qt, pyqtSignal, QRectF, QUrl, QProcess, QThread,
+                           pyqtSlot, QTimer, QRectF)
+from PyQt5.QtWidgets import (QWidget, QLabel, QVBoxLayout, QInputDialog, QTextEdit,
+                              QApplication, QMenu, QAction, QPushButton, QErrorMessage)
+from PyQt5.QtGui import QPixmap, QColor, QFont, QFontDatabase, QPainterPath, QRegion, QIcon
+from gui import tint_pixmap
+from media import DynamMedia
+from Error import Error
+import glob
+MM = '{EMC}'
+
+class ShortcutWorker(QObject):
+    output_signal = pyqtSignal()
+    error_signal = pyqtSignal()
+    finished_signal = pyqtSignal()
+    prompt_signal = pyqtSignal(str)
+    def __init__(self, shortcut, args):
+        super().__init__(shortcut)
+        self.shortcut = shortcut
+        self.args = args
+        self.process = None
+    def run(self):
+        exe = self.shortcut.get("exe")
+        file = self.shortcut.get("file")
+        dir_name = getattr(self.shortcut, "path")
+        self.process = QProcess(self)
+        self.process.setWorkingDirectory(dir_name)
+        self.process.readyReadStandardOutput.connect(self.output_signal.emit)
+        self.process.readyReadStandardError.connect(self.error_signal.emit)
+        self.process.finished.connect(self.finished_signal.emit)
+        self.process.start(exe, [file] + self.args)
+    @pyqtSlot(str)
+    def write(self, value : str):
+        self.process.write(bytes((value + '\n').encode('utf-8')))
+        self.process.waitForBytesWritten()
+class Shortcut(QObject):
+    def __init__(self, path, parent : QWidget = None):
+        super().__init__(None)
+        self._parent = parent
+        self.auto = False
+        self.good = False
+        self.gui = None
+        self.path = path
+        self.process = None
+
+        self.init()
+    def init(self):
+        error = 0
+        if os.path.exists(self.path):
+            self.info_dict = dict()
+            info_file = os.path.join(self.path, "info.json")
+            if os.path.exists(info_file):
+                with open(info_file, "r") as file:
+                    try:
+                        self.info_dict = json.loads(file.read())
+                    except json.JSONDecodeError as e:
+                        self.info_dict["name"] = "[!]Error[!]"
+                        Error(f"Error: Failed to parse info.json file in shortcut path: {info_file}", self._parent)
+                        error = 1
+            shortcut_dict = dict()
+            for key in ["name", "disc", "background_color", "icon"]:
+                info_v = self.info_dict.get(key)
+                if info_v:
+                    shortcut_dict[key] = info_v
+
+            paths = [
+            {"name": "file",       "path": "file/*.py"},
+            {"name": "exe",        "path": ["venv/Scripts/python.exe", "venv/bin/python"]},
+            {"name": "icon",       "path": "icon/*"},
+            {"name": "automation", "path": ".auto"},
+            ]
+
+            for path in paths:
+                path_n = path["name"]
+                path_p = path["path"]
+                if isinstance(path_p, str):
+                        path_temp = glob.glob(os.path.join(self.path, path_p))
+                        if path_temp and os.path.exists(path_temp[0]):
+                            self.info_dict[path_n] = path_temp[0]
+                if isinstance(path_p, list):
+                    for path_s in path_p:
+                        path_temp = os.path.join(self.path, path_s)
+                        if os.path.exists(path_temp):
+                            self.info_dict[path_n] = path_temp
+                    if not self.info_dict.get(path_n):
+                        self.info_dict[path_n] = sys.executable
+            
+                    
+            self.good = True if self.info_dict.get("file") and not error else False
+            self.gui = ShortcutGui(shortcut_dict, self.good, self._parent)
+            self.gui.run_signal.connect(self.run)
+    def get(self, name):
+        return self.info_dict.get(name)
+    def getGui(self):
+        return self.gui
+    def run(self, args):
+        if self.good:
+            
+            self._thread = QThread(self)
+            worker = ShortcutWorker(self, args)
+            worker.moveToThread(self._thread)
+
+            worker.output_signal.connect(lambda: self.handleOutput(worker))
+            self.gui.write_signal.connect(worker.write)
+            worker.error_signal.connect(lambda: self.handleError(worker.process))
+
+            worker.finished_signal.connect(self._thread.quit)
+            worker.finished_signal.connect(worker.deleteLater)
+            worker.finished_signal.connect(self.gui.finished)
+
+            self._thread.started.connect(worker.run)
+            self._thread.finished.connect(self._thread.deleteLater)
+            self._thread.start()
+            print("good and running")
+        else:
+            print("not good")    
+    def handleOutput(self, worker):
+        process = worker.process
+        if process:
+            output = bytes(process.readAllStandardOutput()).decode("utf-8", errors="ignore").strip()
+            for line in output.splitlines():
+                if line.startswith(MM):
+                    self.gui.handleMsg(line.split(MM, 1)[1], process)
+    def handleError(self, process):
+        output = bytes(process.readAllStandardError()).decode("utf-8", errors="ignore").strip()
+        for line in output.splitlines():
+            print(line)
+
+class Menu(QWidget):
+    clicked_signal = pyqtSignal(str)
+    def __init__(self, menu_dict : dict, parent : QWidget = None):
+        super().__init__(parent)
+        self.dict = menu_dict
+        self.options : list[QPushButton] = []
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        if not isinstance(self.dict, dict) and isinstance(self.dict, str):
+            try:
+                self.dict = json.loads(self.dict)
+            except Exception as e:
+                print(f"Json Exception: {e}")
+
+        for key, value in self.dict.items():
+            option = QPushButton(key, self)
+            option.clicked.connect(lambda checked=False, v=value: self.clicked_signal.emit(v))
+            # option.setStyleSheet("background-color:rgb(25,25,25); color:lightgrey; border:none;")
+            option.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(25, 25, 25, 0.9);
+                    color: lightgrey;
+                    border: none;
+                    border-radius: 0px;
+                }
+                QPushButton:hover {
+                    background-color: rgba(50, 50, 50, 0.9);
+                }
+            """)
+            self.options.append(option)
+
+    def resizeEvent(self, a0):
+        path = QPainterPath()
+        path.addRoundedRect(QRectF(self.rect()), 10, 10)
+        region = QRegion(path.toFillPolygon().toPolygon())
+        self.setMask(region)
+        
+        # Layout the buttons
+        width = self.width()
+        height = self.height() // max(len(self.options), 1)
+        y = 0
+        for option in self.options:
+            option.setGeometry(0, y, width, height)
+            y += height
+
+
+
+class ShortcutGui(QWidget):
+    run_signal = pyqtSignal(list)
+    write_signal = pyqtSignal(str)
+    stop_signal = pyqtSignal()
+    def __init__(self, info = dict, good = bool, parent : QWidget = None):
+        super().__init__(parent)
+
+        self._parent = parent
+        self.setObjectName("parent")
+        self.good = good
+        self.info = info
+        self.initial_color = info.get("background_color", "rgb(75,75,75)")
+        self._style = self._style = (
+            "#parent {"
+            "background-color: {0};"
+            "border-radius: 10px;"
+            "}"
+            "color: white;"
+        )
+        self.setStyleSheet(self._style.format(self.initial_color))    
+        self.setContentsMargins(10,10,10,10)
+        
+        self.name = QLabel(self.info.get("name", "Unnamed").capitalize(), self)
+        self.name.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        font = QFont("Ariel", 12,10,False)
+        self.name.setFont(font)
+
+        self.optionsButton = QPushButton(QIcon("resources/options.png"), "", self)
+        self.optionsButton.clicked.connect(lambda: print("Displaying options menu..."))
+
+        self.editButton = QPushButton(QIcon("resources/edit.png"), "", self)
+        self.editButton.clicked.connect(lambda:print("Displaying edit menu...")) #Improve shortcut creator in general and to load shortcuts and make this display it
+
+        self.deleteButton = QPushButton(QIcon("resources/delete.png"), "", self)
+        self.deleteButton.clicked.connect(lambda:print("Deleting shortcut..."))
+        
+        print(self.info)
+        if self.info.get("icon"):
+            self.icon_pixmap = QPixmap(self.info.get("icon"))
+            if not self.icon_pixmap.isNull():
+                self.icon = QLabel(self)
+                self.icon.setPixmap(self.icon_pixmap)
+        if not self.good:
+            self.lock_pixmap = QPixmap('resources/lock.png')
+            self.lock_pixmap = tint_pixmap(self.lock_pixmap, QColor(200, 0, 0))
+            if not self.lock_pixmap.isNull():
+                self.lock = QLabel(self)
+                self.lock.setStyleSheet("background-color:transparent;")
+                self.lock.setPixmap(self.lock_pixmap)
+
+        #Make this show shortcut creator after improving shortcut creator
+        # self.option_button = QPushButton(QIcon("resources/option.png"))
+        # self.option_button.clicked.connect()
+
+        self.message_d : QTextEdit = None
+        self.media_d : DynamMedia = None
+        self._menu : Menu = None
+        self.setAcceptDrops(True)
+        self.setVisible(True)
+    def dropEvent(self, a0):
+        if a0.mimeData().hasUrls():
+            urls = a0.mimeData().urls()
+            for i, url in enumerate(urls):
+                url_str = url.toString()
+                if "file:///" in url_str:
+                    urls[i] = url.toLocalFile()
+                else:
+                    urls[i] = url.toString()
+            self.run_signal.emit(urls)
+        else:
+            print("no urls found")
+    def dragEnterEvent(self, a0):
+        if a0.mimeData().hasUrls():
+            a0.acceptProposedAction()
+        else:
+            a0.ignore()
+    def resizeEvent(self, event):
+        width = self.width()
+        height = self.height()
+        self.name.adjustSize()
+        # self.name.setGeometry(0,0,width,height)
+        
+        icon_width = width // 3
+        icon_height = height // 3
+        if self.info.get("icon") and not self.icon_pixmap.isNull():
+            self.icon.setGeometry(5, 5, icon_width, icon_height)
+            scaled = self.icon_pixmap.scaled(self.icon.width(), 
+                                            self.icon.height(),
+                                            Qt.AspectRatioMode.IgnoreAspectRatio,
+                                            Qt.TransformationMode.SmoothTransformation
+                                            )
+            self.icon.setPixmap(scaled)
+        if not self.good:
+            self.lock.setGeometry((width - icon_width) - 5, 5, icon_width, icon_height)
+            
+            if not self.lock_pixmap.isNull():
+                # Scale first
+                scaled = self.lock_pixmap.scaled(
+                    self.lock.width(), self.lock.height(),
+                    Qt.AspectRatioMode.IgnoreAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation
+                )
+
+                self.lock.setPixmap(scaled)
+                self.lock.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        else:
+            for i, button in enumerate([self.optionsButton, self.editButton, self.deleteButton]):
+                y = 30
+                self.optionsButton.setGeometry(width - 30, y * i, 30, 30)
+
+        if self.message_d:
+            self.message_d.setGeometry(5,10,width - 10, height // 3)
+        if self.media_d:
+            self.media_d.setGeometry(0,0, width, height)
+        super().resizeEvent(event)
+    def mousePressEvent(self, event):
+        self.run_signal.emit([])
+        super().mousePressEvent(event)
+    def enterEvent(self, a0):
+        palette = self.palette()
+        background_color = palette.color(self.backgroundRole())
+        r, g, b, a = background_color.getRgb()
+
+        # Darken the color, making sure values stay within 0-255
+        r = max(r - 30, 0)
+        g = max(g - 30, 0)
+        b = max(b - 30, 0)
+
+        self.setStyleSheet(self._style.format(f"rgb({r},{g},{b})"))
+        super().enterEvent(a0)
+    def leaveEvent(self, a0):
+        self.setStyleSheet(self._style.format(self.initial_color))
+        super().leaveEvent(a0)
+    def handleMsg(self, msg, process):
+        msg = json.loads(msg)
+        print(msg)
+        a = {}
+        key = list(msg.keys())[0]
+        value = msg[key]
+        def prompt(placeholder):
+            text, ok = QInputDialog.getText(self, "Input", placeholder)
+            if ok:
+                self.write_signal.emit(text)
+        def message(msg):
+            if self.message_d:
+                self.message_d.setVisible(False)
+                self.message_d.deleteLater()
+                self.message_d = None
+            self.message_d = QTextEdit(msg, self)
+            self.message_d.setStyleSheet("background-color:rgb(25,25,25);")
+            self.message_d.setTextColor(Qt.GlobalColor.white)
+            self.message_d.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.message_d.setReadOnly(True)
+            self.message_d.setGeometry(5,10, self.width() - 10, self.height() // 3)
+            self.message_d.setVisible(True)
+        def display(src):
+            if self.media_d:
+                self.media_d.setVisible(False)
+                self.media_d.deleteLater()
+                self.media_d = None
+            self.media_d = DynamMedia(src, self)
+            self.media_d.setGeometry(0,0,self.width(), self.height())
+            print(f"Displaying source {src}")
+
+        def menu(menu_dict):
+            if not isinstance(menu_dict, dict) and isinstance(menu_dict, str):
+                try:
+                    menu_dict = json.loads(menu_dict)
+                except Exception as e:
+                    print(f"Invalid menu_dict JSON: {e}")
+                    return
+            window = QApplication.activeWindow() or QWidget()
+
+            width = window.width()
+            height = window.height()
+
+            self._menu = Menu(menu_dict, window)
+            self._menu.clicked_signal.connect(self.write_signal.emit)
+            self._menu.setGeometry(width // 4, 15, width // 2, height // 3)
+            self._menu.show()
+        msg_dict = {
+            "message":message,
+            "prompt":prompt,
+            "display":display,
+            "menu":menu
+        }
+        
+        return (key, msg_dict[key](value))
+    def start(self):
+        # Create process end button for each instance
+        ""
+    #Clean up process guis stuff
+    def finished(self):
+        @pyqtSlot()
+        def clean():
+            if self.message_d:
+                self.message_d.setVisible(False)
+                self.message_d.deleteLater()
+                self.message_d = None
+                # print("Cleaned")
+            if self.media_d:
+                self.media_d.setVisible(False)
+                self.media_d.deleteLater()
+                self.media_d = None
+            if self._menu:
+                self._menu.setVisible(False)
+                self._menu.deleteLater()
+                self._menu = None
+        timer = QTimer(self)
+        timer.singleShot(1500, clean)
+        # print("Program Finished")

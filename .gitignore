@@ -1,0 +1,8 @@
+/__pycache__
+/venv
+*.exe
+/shortcut
+/dist
+/build
+/bin
+test.py
