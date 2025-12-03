@@ -36,6 +36,8 @@ class ShortcutWorker(QObject):
     def write(self, value : str):
         self.process.write(bytes((value + '\n').encode('utf-8')))
         self.process.waitForBytesWritten()
+    def kill(self):
+        self.process.kill()
 class Shortcut(QObject):
     def __init__(self, path, parent : QWidget = None):
         super().__init__(None)
@@ -79,7 +81,6 @@ class Shortcut(QObject):
                 if isinstance(path_p, str):
                         print(path_n)
                         path_temp = glob.glob(os.path.join(self.path, path_p))
-                        print(path_temp)
                         if path_temp and os.path.exists(path_temp[0]):
                             self.info_dict[path_n] = path_temp[0]
                 if isinstance(path_p, list):
@@ -113,7 +114,8 @@ class Shortcut(QObject):
             worker.finished_signal.connect(self._thread.quit)
             worker.finished_signal.connect(worker.deleteLater)
             worker.finished_signal.connect(self.gui.finished)
-            self.gui.stop_signal.connect(worker.force_finish_signal.emit)
+
+            self.gui.stop_signal.connect(worker.kill)
 
             self._thread.started.connect(worker.run)
             self._thread.finished.connect(self._thread.deleteLater)
