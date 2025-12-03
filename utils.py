@@ -107,7 +107,7 @@ class ShortcutCreator(QWidget):
     def __init__(self, shortcut : QWidget = None, parent : QWidget = None):
         super().__init__(parent)
         self._parent = parent
-        
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground)
         self.setStyleSheet("background-color:rgb(24,24,24);")
 
         self.shortcut = shortcut

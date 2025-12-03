@@ -92,7 +92,13 @@ class MainWindow(QWidget):
 
         return shortcuts
 
-    
+    def deleteShortcut(self, shortcut : ShortcutGui):
+        for s in self.shortcuts:
+            if s.getGui() == shortcut:
+                shortcut.setVisible(False)
+                shortcut.deleteLater()
+            self.shortcuts.remove(s)
+        self.resizeEvent(None)
     def resizeEvent(self, event):
         if self.pause == False:
             column = 0

@@ -1,8 +1,8 @@
-import os, json, sys
+import os, json, sys, shutil
 from PyQt5.QtCore import (QObject, Qt, pyqtSignal, QRectF, QUrl, QProcess, QThread,
                            pyqtSlot, QTimer, QRectF)
 from PyQt5.QtWidgets import (QWidget, QLabel, QVBoxLayout, QInputDialog, QTextEdit,
-                              QApplication, QMenu, QAction, QPushButton, QErrorMessage)
+                              QApplication, QMenu, QAction, QPushButton, QMessageBox)
 from PyQt5.QtGui import QPixmap, QColor, QFont, QFontDatabase, QPainterPath, QRegion, QIcon
 from gui import tint_pixmap
 from media import DynamMedia
@@ -14,6 +14,7 @@ class ShortcutWorker(QObject):
     output_signal = pyqtSignal()
     error_signal = pyqtSignal()
     finished_signal = pyqtSignal()
+    force_finish_signal = pyqtSignal()
     prompt_signal = pyqtSignal(str)
     def __init__(self, shortcut, args):
         super().__init__(shortcut)
@@ -29,6 +30,7 @@ class ShortcutWorker(QObject):
         self.process.readyReadStandardOutput.connect(self.output_signal.emit)
         self.process.readyReadStandardError.connect(self.error_signal.emit)
         self.process.finished.connect(self.finished_signal.emit)
+        self.force_finish_signal.connect(self.process.kill)
         self.process.start(exe, [file] + self.args)
     @pyqtSlot(str)
     def write(self, value : str):
@@ -59,10 +61,10 @@ class Shortcut(QObject):
                         Error(f"Error: Failed to parse info.json file in shortcut path: {info_file}", self._parent)
                         error = 1
             shortcut_dict = dict()
-            for key in ["name", "disc", "background_color", "icon"]:
-                info_v = self.info_dict.get(key)
-                if info_v:
-                    shortcut_dict[key] = info_v
+            # for key in ["name", "disc", "background_color", "icon"]:
+            #     info_v = self.info_dict.get(key)
+            #     if info_v:
+            #         shortcut_dict[key] = info_v
 
             paths = [
             {"name": "file",       "path": "file/*.py"},
@@ -75,7 +77,9 @@ class Shortcut(QObject):
                 path_n = path["name"]
                 path_p = path["path"]
                 if isinstance(path_p, str):
+                        print(path_n)
                         path_temp = glob.glob(os.path.join(self.path, path_p))
+                        print(path_temp)
                         if path_temp and os.path.exists(path_temp[0]):
                             self.info_dict[path_n] = path_temp[0]
                 if isinstance(path_p, list):
@@ -86,10 +90,11 @@ class Shortcut(QObject):
                     if not self.info_dict.get(path_n):
                         self.info_dict[path_n] = sys.executable
             
-                    
+            shortcut_dict.update(self.info_dict)
             self.good = True if self.info_dict.get("file") and not error else False
             self.gui = ShortcutGui(shortcut_dict, self.good, self._parent)
             self.gui.run_signal.connect(self.run)
+            self.gui.delete_signal.connect(self.delete)
     def get(self, name):
         return self.info_dict.get(name)
     def getGui(self):
@@ -108,6 +113,7 @@ class Shortcut(QObject):
             worker.finished_signal.connect(self._thread.quit)
             worker.finished_signal.connect(worker.deleteLater)
             worker.finished_signal.connect(self.gui.finished)
+            self.gui.stop_signal.connect(worker.force_finish_signal.emit)
 
             self._thread.started.connect(worker.run)
             self._thread.finished.connect(self._thread.deleteLater)
@@ -126,6 +132,25 @@ class Shortcut(QObject):
         output = bytes(process.readAllStandardError()).decode("utf-8", errors="ignore").strip()
         for line in output.splitlines():
             print(line)
+    def delete(self):
+        confirmBox = QMessageBox(self._parent)
+        confirmBox.setWindowTitle("Are you sure?")
+        confirmBox.setText("Are you sure you want to delete this shortcut?")
+        confirmBox.setStandardButtons(QMessageBox.StandardButton.Cancel | QMessageBox.StandardButton.Ok)
+        confirmBox.setDefaultButton(QMessageBox.StandardButton.Ok)
+        confirmBox.setWindowFlags(Qt.FramelessWindowHint)
+        confirmBox.setStyleSheet("background-color:rgb(50,50,50);color:lightgrey; border-radius:10px; padding:10;")
+        for button in confirmBox.buttons():
+            text = button.text()
+            if text == "&OK":
+                button.setStyleSheet("color:green;")
+            else:
+                button.setStyleSheet("color:red;")
+        res = confirmBox.exec()
+        if res == QMessageBox.StandardButton.Ok:
+            self._parent.deleteShortcut(self.gui)
+            shutil.rmtree(self.path)
+            self.deleteLater()
 
 class Menu(QWidget):
     clicked_signal = pyqtSignal(str)
@@ -174,9 +199,10 @@ class Menu(QWidget):
 
 
 class ShortcutGui(QWidget):
-    run_signal = pyqtSignal(list)
-    write_signal = pyqtSignal(str)
-    stop_signal = pyqtSignal()
+    run_signal = pyqtSignal(list) # Signal for telling shortcut class it should run the shortcut
+    write_signal = pyqtSignal(str) # Signal to send input data back to shortcut to write to shortcut process
+    stop_signal = pyqtSignal() # Signal to tell shortcut class to force stop shortcut process
+    delete_signal = pyqtSignal() # Signal to tell shortcut class that shortcut is going to be deleted for proper cleanup
     def __init__(self, info = dict, good = bool, parent : QWidget = None):
         super().__init__(parent)
 
@@ -184,14 +210,10 @@ class ShortcutGui(QWidget):
         self.setObjectName("parent")
         self.good = good
         self.info = info
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground)
         self.initial_color = info.get("background_color", "rgb(75,75,75)")
-        self._style = self._style = (
-            "#parent {"
-            "background-color: {0};"
-            "border-radius: 10px;"
-            "}"
-            "color: white;"
-        )
+        self._style = self._style = "background-color:{0}; border-radius:10px; color:lightgrey;"
+        
         self.setStyleSheet(self._style.format(self.initial_color))    
         self.setContentsMargins(10,10,10,10)
         
@@ -200,15 +222,19 @@ class ShortcutGui(QWidget):
         font = QFont("Ariel", 12,10,False)
         self.name.setFont(font)
 
-        self.optionsButton = QPushButton(QIcon("resources/options.png"), "", self)
-        self.optionsButton.clicked.connect(lambda: print("Displaying options menu..."))
+        self.cancelButton = QPushButton(QIcon("resources/close.png"), "", self)
+        self.cancelButton.clicked.connect(self.stop_signal.emit)
 
         self.editButton = QPushButton(QIcon("resources/edit.png"), "", self)
         self.editButton.clicked.connect(lambda:print("Displaying edit menu...")) #Improve shortcut creator in general and to load shortcuts and make this display it
 
         self.deleteButton = QPushButton(QIcon("resources/delete.png"), "", self)
-        self.deleteButton.clicked.connect(lambda:print("Deleting shortcut..."))
+        self.deleteButton.clicked.connect(self.delete_signal.emit)
         
+        self.cancelButton.setVisible(False)
+        self.editButton.setVisible(False)
+        self.deleteButton.setVisible(False)
+
         print(self.info)
         if self.info.get("icon"):
             self.icon_pixmap = QPixmap(self.info.get("icon"))
@@ -223,89 +249,20 @@ class ShortcutGui(QWidget):
                 self.lock.setStyleSheet("background-color:transparent;")
                 self.lock.setPixmap(self.lock_pixmap)
 
-        #Make this show shortcut creator after improving shortcut creator
-        # self.option_button = QPushButton(QIcon("resources/option.png"))
-        # self.option_button.clicked.connect()
-
         self.message_d : QTextEdit = None
         self.media_d : DynamMedia = None
         self._menu : Menu = None
         self.setAcceptDrops(True)
         self.setVisible(True)
-    def dropEvent(self, a0):
-        if a0.mimeData().hasUrls():
-            urls = a0.mimeData().urls()
-            for i, url in enumerate(urls):
-                url_str = url.toString()
-                if "file:///" in url_str:
-                    urls[i] = url.toLocalFile()
-                else:
-                    urls[i] = url.toString()
-            self.run_signal.emit(urls)
-        else:
-            print("no urls found")
-    def dragEnterEvent(self, a0):
-        if a0.mimeData().hasUrls():
-            a0.acceptProposedAction()
-        else:
-            a0.ignore()
-    def resizeEvent(self, event):
-        width = self.width()
-        height = self.height()
-        self.name.adjustSize()
-        # self.name.setGeometry(0,0,width,height)
-        
-        icon_width = width // 3
-        icon_height = height // 3
-        if self.info.get("icon") and not self.icon_pixmap.isNull():
-            self.icon.setGeometry(5, 5, icon_width, icon_height)
-            scaled = self.icon_pixmap.scaled(self.icon.width(), 
-                                            self.icon.height(),
-                                            Qt.AspectRatioMode.IgnoreAspectRatio,
-                                            Qt.TransformationMode.SmoothTransformation
-                                            )
-            self.icon.setPixmap(scaled)
-        if not self.good:
-            self.lock.setGeometry((width - icon_width) - 5, 5, icon_width, icon_height)
-            
-            if not self.lock_pixmap.isNull():
-                # Scale first
-                scaled = self.lock_pixmap.scaled(
-                    self.lock.width(), self.lock.height(),
-                    Qt.AspectRatioMode.IgnoreAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation
-                )
+    """
+    
+    Custom Logic
+    
+    """
 
-                self.lock.setPixmap(scaled)
-                self.lock.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        else:
-            for i, button in enumerate([self.optionsButton, self.editButton, self.deleteButton]):
-                y = 30
-                self.optionsButton.setGeometry(width - 30, y * i, 30, 30)
-
-        if self.message_d:
-            self.message_d.setGeometry(5,10,width - 10, height // 3)
-        if self.media_d:
-            self.media_d.setGeometry(0,0, width, height)
-        super().resizeEvent(event)
-    def mousePressEvent(self, event):
-        self.run_signal.emit([])
-        super().mousePressEvent(event)
-    def enterEvent(self, a0):
-        palette = self.palette()
-        background_color = palette.color(self.backgroundRole())
-        r, g, b, a = background_color.getRgb()
-
-        # Darken the color, making sure values stay within 0-255
-        r = max(r - 30, 0)
-        g = max(g - 30, 0)
-        b = max(b - 30, 0)
-
-        self.setStyleSheet(self._style.format(f"rgb({r},{g},{b})"))
-        super().enterEvent(a0)
-    def leaveEvent(self, a0):
-        self.setStyleSheet(self._style.format(self.initial_color))
-        super().leaveEvent(a0)
+    def run(self, args : list = []):
+        self.cancelButton.setVisible(True)
+        self.run_signal.emit(args)
     def handleMsg(self, msg, process):
         msg = json.loads(msg)
         print(msg)
@@ -326,7 +283,7 @@ class ShortcutGui(QWidget):
             self.message_d.setTextColor(Qt.GlobalColor.white)
             self.message_d.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.message_d.setReadOnly(True)
-            self.message_d.setGeometry(5,10, self.width() - 10, self.height() // 3)
+            # self.message_d.setGeometry(5,10, self.width() - 10, self.height() // 3)
             self.message_d.setVisible(True)
         def display(src):
             if self.media_d:
@@ -359,15 +316,14 @@ class ShortcutGui(QWidget):
             "display":display,
             "menu":menu
         }
-        
-        return (key, msg_dict[key](value))
-    def start(self):
-        # Create process end button for each instance
-        ""
+        result = (key, msg_dict[key](value))
+        self.resizeEvent(None)
+        return result
     #Clean up process guis stuff
     def finished(self):
         @pyqtSlot()
         def clean():
+            self.cancelButton.setVisible(False)
             if self.message_d:
                 self.message_d.setVisible(False)
                 self.message_d.deleteLater()
@@ -384,3 +340,94 @@ class ShortcutGui(QWidget):
         timer = QTimer(self)
         timer.singleShot(1500, clean)
         # print("Program Finished")
+
+
+    """"
+    
+    EVENTS
+    
+    """
+    
+    def dropEvent(self, a0):
+        if a0.mimeData().hasUrls():
+            urls = a0.mimeData().urls()
+            for i, url in enumerate(urls):
+                url_str = url.toString()
+                if "file:///" in url_str:
+                    urls[i] = url.toLocalFile()
+                else:
+                    urls[i] = url.toString()
+            self.run(urls)
+        else:
+            print("no urls found")
+    def dragEnterEvent(self, a0):
+        if a0.mimeData().hasUrls():
+            a0.acceptProposedAction()
+        else:
+            a0.ignore()
+    def resizeEvent(self, event):
+        width = self.width()
+        height = self.height()
+        self.name.adjustSize()
+        self.name.move(int(width // 2 - self.name.width() // 2), int(height // 2 - self.name.height() // 2))
+        self.cancelButton.setGeometry(width - 50, 0, 50,50)
+        icon_width = width // 4
+        icon_height = height // 4
+        if self.info.get("icon") and not self.icon_pixmap.isNull():
+            self.icon.setGeometry(5, 5, icon_width, icon_height)
+            scaled = self.icon_pixmap.scaled(icon_width, 
+                                            icon_height,
+                                            Qt.AspectRatioMode.IgnoreAspectRatio,
+                                            Qt.TransformationMode.SmoothTransformation
+                                            )
+            self.icon.setPixmap(scaled)
+        if not self.good:
+            self.lock.setGeometry((width - icon_width) - 5, 5, icon_width, icon_height)
+            
+            if not self.lock_pixmap.isNull():
+                # Scale first
+                scaled = self.lock_pixmap.scaled(
+                    self.lock.width(), self.lock.height(),
+                    Qt.AspectRatioMode.IgnoreAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation
+                )
+
+                self.lock.setPixmap(scaled)
+                self.lock.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        for i, button in enumerate([self.editButton, self.deleteButton]):
+            button_width = 50
+            button_height = button_width
+            button.setGeometry(width - 50, button_height * (i + 1), 50, 50)
+
+        media_width = width - 50
+        media_height = height // 3
+        if self.message_d:
+            self.message_d.setGeometry(5,0, media_width, height)
+        if self.media_d:
+            self.media_d.setGeometry(0,0, media_width, height)
+        super().resizeEvent(event)
+    def mousePressEvent(self, event):
+        self.run([])
+        super().mousePressEvent(event)
+    def enterEvent(self, a0):
+        palette = self.palette()
+        background_color = palette.color(self.backgroundRole())
+        r, g, b, a = background_color.getRgb()
+
+        # Darken the color, making sure values stay within 0-255
+        r = max(r - 30, 0)
+        g = max(g - 30, 0)
+        b = max(b - 30, 0)
+
+        self.setStyleSheet(self._style.format(f"rgb({r},{g},{b})"))
+
+        self.editButton.setVisible(True)
+        self.deleteButton.setVisible(True)
+            
+        super().enterEvent(a0)
+    def leaveEvent(self, a0):
+        self.setStyleSheet(self._style.format(self.initial_color))
+        self.editButton.setVisible(False)
+        self.deleteButton.setVisible(False)
+        super().leaveEvent(a0)

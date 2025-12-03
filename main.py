@@ -9,7 +9,3 @@ if __name__ == "__main__":
     app.aboutToQuit.connect(window.quit)
     # creator = ShortcutCreator(None)
     sys.exit(app.exec_())
-
-
-
-
