@@ -1,11 +1,11 @@
-from PyQt5.QtWidgets import QApplication
+from PyQt5.QtWidgets import QApplication, QCommonStyle
 import sys
 from window import MainWindow
 
 
 if __name__ == "__main__":
     app = QApplication([])
+    app.setStyleSheet("*{background-color:rgb(100,100,100);color:lightgrey;}")
     window = MainWindow()
     app.aboutToQuit.connect(window.quit)
-    # creator = ShortcutCreator(None)
     sys.exit(app.exec_())

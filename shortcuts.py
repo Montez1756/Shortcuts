@@ -213,8 +213,9 @@ class ShortcutGui(QWidget):
         self.good = good
         self.info = info
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground)
+        self.setObjectName("main")
         self.initial_color = info.get("background_color", "rgb(75,75,75)")
-        self._style = self._style = "background-color:{0}; border-radius:10px; color:lightgrey;"
+        self._style = self._style = "#main{{background-color:{0}; border-radius:10px;}} QLabel{{background-color:transparent; color:lightgrey;}} #button{{background-color:transparent;}}"
         
         self.setStyleSheet(self._style.format(self.initial_color))    
         self.setContentsMargins(10,10,10,10)
@@ -233,11 +234,14 @@ class ShortcutGui(QWidget):
         self.deleteButton = QPushButton(QIcon("resources/delete.png"), "", self)
         self.deleteButton.clicked.connect(self.delete_signal.emit)
         
+        #create container widget for buttons and use layout to organize
+        self.cancelButton.setObjectName("button")
+        self.editButton.setObjectName("button")
+        self.deleteButton.setObjectName("button")
         self.cancelButton.setVisible(False)
         self.editButton.setVisible(False)
         self.deleteButton.setVisible(False)
 
-        print(self.info)
         if self.info.get("icon"):
             self.icon_pixmap = QPixmap(self.info.get("icon"))
             if not self.icon_pixmap.isNull():
@@ -262,32 +266,42 @@ class ShortcutGui(QWidget):
     
     """
 
-    def run(self, args : list = []):
+    def run(self, args : list = []) -> None:
         self.cancelButton.setVisible(True)
         self.run_signal.emit(args)
-    def handleMsg(self, msg, process):
+    def handleMsg(self, msg : str, process : QProcess) -> tuple:
         msg = json.loads(msg)
         print(msg)
         a = {}
         key = list(msg.keys())[0]
         value = msg[key]
         def prompt(placeholder):
-            text, ok = QInputDialog.getText(self, "Input", placeholder)
-            if ok:
+            dlg = QInputDialog(self, Qt.WindowType.FramelessWindowHint)
+            dlg.setLabelText(placeholder.capitalize())
+            dlg.setInputMode(QInputDialog.TextInput)
+
+            if dlg.exec_() == QInputDialog.Accepted:
+                text = dlg.textValue()
                 self.write_signal.emit(text)
-        def message(msg):
-            if self.message_d:
-                self.message_d.setVisible(False)
-                self.message_d.deleteLater()
-                self.message_d = None
-            self.message_d = QTextEdit(msg, self)
-            self.message_d.setStyleSheet("background-color:rgb(25,25,25);")
-            self.message_d.setTextColor(Qt.GlobalColor.white)
-            self.message_d.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.message_d.setReadOnly(True)
-            # self.message_d.setGeometry(5,10, self.width() - 10, self.height() // 3)
-            self.message_d.setVisible(True)
-        def display(src):
+            else:
+                self.finished()
+            # text, ok = QInputDialog.getText(self._parent, "Input", placeholder.capitalize(), flags=Qt.WindowType.FramelessWindowHint | Qt.WindowType.ToolTip)
+            # if ok:
+            #     self.write_signal.emit(text)
+            # else:
+            #     self.finished()
+        def message(msg : str) -> None:
+            if self.media_d:
+                self.media_d.setVisible(False)
+                self.media_d.deleteLater()
+                self.media_d = None
+            self.media_d = QTextEdit(msg, self)
+            self.media_d.setStyleSheet("background-color:rgb(25,25,25);")
+            self.media_d.setTextColor(Qt.GlobalColor.white)
+            self.media_d.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.media_d.setReadOnly(True)
+            self.media_d.setVisible(True)
+        def display(src : str) -> None:
             if self.media_d:
                 self.media_d.setVisible(False)
                 self.media_d.deleteLater()
@@ -296,11 +310,12 @@ class ShortcutGui(QWidget):
             self.media_d.setGeometry(0,0,self.width(), self.height())
             print(f"Displaying source {src}")
 
-        def menu(menu_dict):
+        def menu(menu_dict : dict) -> None:
             if not isinstance(menu_dict, dict) and isinstance(menu_dict, str):
                 try:
                     menu_dict = json.loads(menu_dict)
                 except Exception as e:
+                    self.finished()
                     print(f"Invalid menu_dict JSON: {e}")
                     return
             window = QApplication.activeWindow() or QWidget()
@@ -403,11 +418,10 @@ class ShortcutGui(QWidget):
             button.setGeometry(width - 50, button_height * (i + 1), 50, 50)
 
         media_width = width - 50
-        media_height = height // 3
         if self.message_d:
-            self.message_d.setGeometry(5,0, media_width, height)
+            self.message_d.setGeometry(5,5, media_width, height - 10)
         if self.media_d:
-            self.media_d.setGeometry(0,0, media_width, height)
+            self.media_d.setGeometry(5,5, media_width, height - 10)
         super().resizeEvent(event)
     def mousePressEvent(self, event):
         self.run([])

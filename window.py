@@ -30,7 +30,6 @@ class MainWindow(QWidget):
         self.icon = QSystemTrayIcon(self.windowIcon(), self)
         self.icon.activated.connect(self.trayTriggered)
         menu = QMenu(self)
-        menu.setStyleSheet("color:white;")
         show = QAction("Show", menu)
         show.triggered.connect(self.show)
         
@@ -54,7 +53,7 @@ class MainWindow(QWidget):
         self.reload_button.clicked.connect(self.reload)
 
         self.shortcut_button = QPushButton("+", self)
-        self.shortcut_button.setStyleSheet("background-color:rgb(24,24,24); color:white; border:none; font-size:30px;")
+        self.shortcut_button.setStyleSheet("background-color:rgb(24,24,24); border:none; font-size:30px;")
         
         self.shortcut_creator = ShortcutCreator(None, self)
         
