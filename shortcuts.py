@@ -8,6 +8,7 @@ from gui import tint_pixmap
 from media import DynamMedia
 from Error import Error
 import glob
+from input import InputDialog, InputType
 MM = '{EMC}'
 
 class ShortcutWorker(QObject):
@@ -135,21 +136,6 @@ class Shortcut(QObject):
         for line in output.splitlines():
             print(line)
     def delete(self):
-        confirmBox = QMessageBox(self._parent)
-        confirmBox.setWindowTitle("Are you sure?")
-        confirmBox.setText("Are you sure you want to delete this shortcut?")
-        confirmBox.setStandardButtons(QMessageBox.StandardButton.Cancel | QMessageBox.StandardButton.Ok)
-        confirmBox.setDefaultButton(QMessageBox.StandardButton.Ok)
-        confirmBox.setWindowFlags(Qt.FramelessWindowHint)
-        confirmBox.setStyleSheet("background-color:rgb(50,50,50);color:lightgrey; border-radius:10px; padding:10;")
-        for button in confirmBox.buttons():
-            text = button.text()
-            if text == "&OK":
-                button.setStyleSheet("color:green;")
-            else:
-                button.setStyleSheet("color:red;")
-        res = confirmBox.exec()
-        if res == QMessageBox.StandardButton.Ok:
             self._parent.deleteShortcut(self.gui)
             shutil.rmtree(self.path)
             self.deleteLater()
@@ -215,7 +201,7 @@ class ShortcutGui(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground)
         self.setObjectName("main")
         self.initial_color = info.get("background_color", "rgb(75,75,75)")
-        self._style = self._style = "#main{{background-color:{0}; border-radius:10px;}} QLabel{{background-color:transparent; color:lightgrey;}} #button{{background-color:transparent;}}"
+        self._style = self._style = "#main{{background-color:{0}; border-radius:10px;}} QLabel{{background-color:transparent; color:lightgrey;}} #button{{background-color:transparent;}} QDialog{{border-radius:10px;}}"
         
         self.setStyleSheet(self._style.format(self.initial_color))    
         self.setContentsMargins(10,10,10,10)
@@ -232,7 +218,7 @@ class ShortcutGui(QWidget):
         self.editButton.clicked.connect(lambda:print("Displaying edit menu...")) #Improve shortcut creator in general and to load shortcuts and make this display it
 
         self.deleteButton = QPushButton(QIcon("resources/delete.png"), "", self)
-        self.deleteButton.clicked.connect(self.delete_signal.emit)
+        self.deleteButton.clicked.connect(self.delete)
         
         #create container widget for buttons and use layout to organize
         self.cancelButton.setObjectName("button")
@@ -260,6 +246,7 @@ class ShortcutGui(QWidget):
         self._menu : Menu = None
         self.setAcceptDrops(True)
         self.setVisible(True)
+        self.dlg = None
     """
     
     Custom Logic
@@ -269,22 +256,56 @@ class ShortcutGui(QWidget):
     def run(self, args : list = []) -> None:
         self.cancelButton.setVisible(True)
         self.run_signal.emit(args)
+    #Clean up process guis stuff
+    def finished(self):
+        @pyqtSlot()
+        def clean():
+            self.cancelButton.setVisible(False)
+            if self.message_d:
+                self.message_d.setVisible(False)
+                self.message_d.deleteLater()
+                self.message_d = None
+                # print("Cleaned")
+            if self.media_d:
+                self.media_d.setVisible(False)
+                self.media_d.deleteLater()
+                self.media_d = None
+            if self._menu:
+                self._menu.setVisible(False)
+                self._menu.deleteLater()
+                self._menu = None
+        timer = QTimer(self)
+        timer.singleShot(1500, clean)
+        # print("Program Finished")
     def handleMsg(self, msg : str, process : QProcess) -> tuple:
         msg = json.loads(msg)
         print(msg)
         a = {}
         key = list(msg.keys())[0]
         value = msg[key]
-        def prompt(placeholder):
-            dlg = QInputDialog(self, Qt.WindowType.FramelessWindowHint)
-            dlg.setLabelText(placeholder.capitalize())
-            dlg.setInputMode(QInputDialog.TextInput)
-
-            if dlg.exec_() == QInputDialog.Accepted:
-                text = dlg.textValue()
-                self.write_signal.emit(text)
+        def prompt(prompt_ob : dict) -> None:
+            label = prompt_ob.get("label")
+            placeholder = prompt_ob.get("placeholder")
+            input_mask = prompt_ob.get("mask")
+            self.dlg = InputDialog(self, label, placeholder, input_mask)
+            self.dlg.show()
+            res = self.dlg.exec_()
+            if res == InputDialog.Accepted:
+                self.write_signal.emit(self.dlg.text())
             else:
                 self.finished()
+            # dlg = QInputDialog(self)
+            # dlg.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog)
+            # dlg.setLabelText(placeholder.capitalize())
+            # dlg.setInputMode(QInputDialog.TextInput)
+            # dlg.setStyleSheet("border-radius:10px;")
+
+            # dlg.setModal(True)
+            # if dlg.exec_() == QInputDialog.Accepted:
+            #     text = dlg.textValue()
+            #     self.write_signal.emit(text)
+            # else:
+            #     self.finished()
             # text, ok = QInputDialog.getText(self._parent, "Input", placeholder.capitalize(), flags=Qt.WindowType.FramelessWindowHint | Qt.WindowType.ToolTip)
             # if ok:
             #     self.write_signal.emit(text)
@@ -336,28 +357,13 @@ class ShortcutGui(QWidget):
         result = (key, msg_dict[key](value))
         self.resizeEvent(None)
         return result
-    #Clean up process guis stuff
-    def finished(self):
-        @pyqtSlot()
-        def clean():
-            self.cancelButton.setVisible(False)
-            if self.message_d:
-                self.message_d.setVisible(False)
-                self.message_d.deleteLater()
-                self.message_d = None
-                # print("Cleaned")
-            if self.media_d:
-                self.media_d.setVisible(False)
-                self.media_d.deleteLater()
-                self.media_d = None
-            if self._menu:
-                self._menu.setVisible(False)
-                self._menu.deleteLater()
-                self._menu = None
-        timer = QTimer(self)
-        timer.singleShot(1500, clean)
-        # print("Program Finished")
-
+    def delete(self):
+        self.del_dlg = InputDialog(self, "Are you sure you want to delete this shortcut", "", "", True)
+        self.del_dlg.show()
+        res = self.del_dlg.exec_()
+        if res == InputDialog.Accepted:
+            self.delete_signal.emit()
+            
 
     """"
     

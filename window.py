@@ -94,9 +94,9 @@ class MainWindow(QWidget):
     def deleteShortcut(self, shortcut : ShortcutGui):
         for s in self.shortcuts:
             if s.getGui() == shortcut:
-                shortcut.setVisible(False)
+                shortcut.hide()
                 shortcut.deleteLater()
-            self.shortcuts.remove(s)
+                self.shortcuts.remove(s)
         self.resizeEvent(None)
     def resizeEvent(self, event):
         if self.pause == False:
@@ -119,7 +119,6 @@ class MainWindow(QWidget):
 
             x = padding
             y = padding + self._scroll
-
             for i, s in enumerate(self.shortcuts):
                 if column == cols:
                     y += s_height + padding
