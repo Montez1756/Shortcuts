@@ -7,7 +7,7 @@ from PyQt5.QtGui import QPixmap, QColor, QFont, QFontDatabase, QPainterPath, QRe
 from gui import tint_pixmap
 from media import DynamMedia
 from Error import Error
-import glob
+from src.utils.config import getShortcutConfig
 from input import InputDialog, InputType
 MM = '{EMC}'
 
@@ -51,50 +51,10 @@ class Shortcut(QObject):
 
         self.init()
     def init(self):
-        error = 0
         if os.path.exists(self.path):
-            self.info_dict = dict()
-            info_file = os.path.join(self.path, "info.json")
-            if os.path.exists(info_file):
-                with open(info_file, "r") as file:
-                    try:
-                        self.info_dict = json.loads(file.read())
-                    except json.JSONDecodeError as e:
-                        self.info_dict["name"] = "[!]Error[!]"
-                        Error(f"Error: Failed to parse info.json file in shortcut path: {info_file}", self._parent)
-                        error = 1
-            shortcut_dict = dict()
-            # for key in ["name", "disc", "background_color", "icon"]:
-            #     info_v = self.info_dict.get(key)
-            #     if info_v:
-            #         shortcut_dict[key] = info_v
-
-            paths = [
-            {"name": "file",       "path": "file/*.py"},
-            {"name": "exe",        "path": ["venv/Scripts/python.exe", "venv/bin/python"]},
-            {"name": "icon",       "path": "icon/*"},
-            {"name": "automation", "path": ".auto"},
-            ]
-
-            for path in paths:
-                path_n = path["name"]
-                path_p = path["path"]
-                if isinstance(path_p, str):
-                        print(path_n)
-                        path_temp = glob.glob(os.path.join(self.path, path_p))
-                        if path_temp and os.path.exists(path_temp[0]):
-                            self.info_dict[path_n] = path_temp[0]
-                if isinstance(path_p, list):
-                    for path_s in path_p:
-                        path_temp = os.path.join(self.path, path_s)
-                        if os.path.exists(path_temp):
-                            self.info_dict[path_n] = path_temp
-                    if not self.info_dict.get(path_n):
-                        self.info_dict[path_n] = sys.executable
-            
-            shortcut_dict.update(self.info_dict)
-            self.good = True if self.info_dict.get("file") and not error else False
-            self.gui = ShortcutGui(shortcut_dict, self.good, self._parent)
+            self.info_dict = getShortcutConfig(self.path)
+            self.good = True if self.info_dict.get("file") else False
+            self.gui = ShortcutGui(self.info_dict, self.good, self._parent)
             self.gui.run_signal.connect(self.run)
             self.gui.delete_signal.connect(self.delete)
     def get(self, name):
@@ -131,6 +91,8 @@ class Shortcut(QObject):
             for line in output.splitlines():
                 if line.startswith(MM):
                     self.gui.handleMsg(line.split(MM, 1)[1], process)
+                else:
+                    print(line)
     def handleError(self, process):
         output = bytes(process.readAllStandardError()).decode("utf-8", errors="ignore").strip()
         for line in output.splitlines():
@@ -254,6 +216,7 @@ class ShortcutGui(QWidget):
     """
 
     def run(self, args : list = []) -> None:
+        print("Running")
         self.cancelButton.setVisible(True)
         self.run_signal.emit(args)
     #Clean up process guis stuff
