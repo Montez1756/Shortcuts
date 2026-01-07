@@ -1,7 +1,7 @@
-from PyQt5.QtMultimediaWidgets import QVideoWidget
+from PyQt5.QtMultimediaWidgets import QVideoWidget, QGraphicsVideoItem
 from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
-from PyQt5.QtWidgets import QWidget, QLabel, QTextEdit
-from PyQt5.QtCore import QUrl, Qt, QRectF
+from PyQt5.QtWidgets import QWidget, QLabel, QTextEdit, QGraphicsScene, QGraphicsView, QSizePolicy
+from PyQt5.QtCore import QUrl, Qt, QRectF, QSizeF
 from PyQt5.QtGui import QPixmap, QPainterPath, QRegion
 import os
 
@@ -32,7 +32,7 @@ class DynamMedia(QWidget):
             self.type = "text"
 
         self.source = source
-        self.main_widget = None
+        self.main_widget : QWidget = None
         self.pixmap = None
 
         if self.type == "video":
@@ -41,19 +41,38 @@ class DynamMedia(QWidget):
             self.image()
         else:
             self.text()
+
         if self.main_widget:
             self.main_widget.setVisible(True)
             self.main_widget.setStyleSheet("border-radius:10px; background-color:rgb(25,25,25);")
+            self.main_widget.raise_()
         self.resizeEvent(None)
         self.show()
     def video(self):
-        self.player = QMediaPlayer(self)
+        self.main_widget = QGraphicsView(self)
+        self.main_widget.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.main_widget.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.main_widget.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
 
-        self.main_widget = QVideoWidget(self)
-        self.player.setMedia(QMediaContent(QUrl.fromLocalFile(self.source)))
-        self.player.setVideoOutput(self.main_widget)
+        self.scene = QGraphicsScene(self)
+        self.main_widget.setScene(self.scene)
+        
+        self.video_item = QGraphicsVideoItem()
+        self.video_item.setAspectRatioMode(Qt.AspectRatioMode.IgnoreAspectRatio)
+        self.scene.addItem(self.video_item)
 
-        self.player.play()
+        player = QMediaPlayer(self)
+        player.setVideoOutput(self.video_item)
+        player.setMedia(QMediaContent(QUrl.fromLocalFile(self.source)))
+        player.play()
+
+        # self.player = QMediaPlayer(self)
+
+        # self.main_widget = QVideoWidget(self)
+        # self.player.setMedia(QMediaContent(QUrl.fromLocalFile(self.source)))
+        # self.player.setVideoOutput(self.main_widget)
+
+        # self.player.play()
     def image(self):
         self.main_widget = QLabel(self)
         self.pixmap = QPixmap(self.source)
@@ -78,6 +97,8 @@ class DynamMedia(QWidget):
 
         if self.main_widget:
             self.main_widget.setGeometry(0,0,width,height)
+        if getattr(self, "video_item", None):
+            self.video_item.setSize(QSizeF(self.size()))
         if self.pixmap:
             pixmap = self.pixmap.scaled(width, height, Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation)
             self.main_widget.setPixmap(pixmap)

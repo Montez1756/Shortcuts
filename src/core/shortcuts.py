@@ -3,7 +3,7 @@ from PyQt5.QtCore import QObject, pyqtSignal,QProcess, pyqtSlot
 from PyQt5.QtWidgets import QWidget
 from src.utils.config import getShortcutConfig
 from .shortcutproccess import ShortcutProccess
-from ..gui.shortcut_gui import ShortcutGui
+from ..gui.shortcutgui import ShortcutGui
 
 class Shortcut(QObject):
     def __init__(self, path, parent : QWidget = None):
@@ -40,6 +40,7 @@ class Shortcut(QObject):
             # self.process.stdout.connect(print)
             # self.process.stderr.connect(print)
             self.process.finished.connect(self.process.deleteLater)
+            self.process.finished.connect(self.gui.finished)
 
             self.process.start()
     def delete(self):

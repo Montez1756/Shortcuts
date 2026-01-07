@@ -58,6 +58,7 @@ class ShortcutProccess(QObject):
         self.stdin.connect(self.worker.write)
         self.worker.finished.connect(self._thread.quit)
         self.worker.finished.connect(self.worker.deleteLater)
+        self.worker.finished.connect(self.finished.emit)
 
         self._thread.started.connect(self.worker.run)
         self._thread.finished.connect(self._thread.deleteLater)
@@ -66,7 +67,7 @@ class ShortcutProccess(QObject):
     def handleStdout(self, value : str):
         for line in value.splitlines():
             if line.startswith("{EMC}"):
-                self.stdipc.emit(line.split("{EMC}")[1])
+                self.stdipc.emit(line.split("{EMC}", 1)[1])
             else:
                 self.stdout.emit(line)
     def kill(self):
