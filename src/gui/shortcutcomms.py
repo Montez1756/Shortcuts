@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QTextEdit, QApplication
 from PyQt5.QtCore import QObject, Qt, pyqtSignal, QTimer
-from input import InputDialog
-from media import DynamMedia
+from gui.input import InputDialog
+from gui.media import DynamMedia
 from .menu import Menu
 import json
 

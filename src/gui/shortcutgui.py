@@ -3,7 +3,7 @@ from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot, QTimer, QProcess
 from PyQt5.QtGui import QFont, QIcon, QPixmap, QColor
 from ..utils.utils import tint_pixmap
 from .shortcutcomms import ShortcutComms
-from input import InputDialog
+from gui.input import InputDialog
 import json
 class ShortcutGui(QWidget):
     run_signal = pyqtSignal(list) # Signal for telling shortcut class it should run the shortcut
